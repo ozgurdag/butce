@@ -310,7 +310,10 @@ canvas{display:block}
       <div class="month-label" id="month-label">—</div>
       <button onclick="changeMonth(1)">&#8250;</button>
     </div>
-    <button class="topbar-settings-btn" onclick="openSettings()">⚙</button>
+    <div style="display:flex;gap:6px">
+      <button class="topbar-settings-btn" onclick="openHelp()">?</button>
+      <button class="topbar-settings-btn" onclick="openSettings()">⚙</button>
+    </div>
   </div>
   <div class="balance-grid">
     <div class="balance-card income"><div class="bl">Gelir</div><div class="bv" id="top-gelir">₺0</div></div>
@@ -338,7 +341,8 @@ canvas{display:block}
     <button class="type-btn" id="btn-gelir" onclick="setType('gelir')">💰 Gelir</button>
   </div>
   <div class="form-section">
-    <div class="form-row fr1"><label class="field-label">Açıklama</label><input type="text" id="desc" placeholder="Ne için?"></div>
+    <div class="form-row fr1"><label class="field-label">Açıklama</label><input type="text" id="desc" placeholder="Ne için?" oninput="suggestCategory(this.value)"></div>
+    <div id="cat-suggestion" style="display:none;margin:-6px 0 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);padding:7px 12px;font-size:11px;color:var(--muted);cursor:pointer" onclick="applySuggestion()"></div>
     <div class="form-row fr2">
       <div><label class="field-label">Tutar</label><input type="number" id="amount" placeholder="0" min="0" step="0.01"></div>
       <div><label class="field-label">Kategori</label><select id="category"></select></div>
@@ -462,6 +466,48 @@ canvas{display:block}
   <div class="card card-pad" id="cat-rows"></div>
 </div>
 
+
+<!-- TEKRARLAYAN HARCAMALAR -->
+<div class="section" id="tab-tekrar">
+  <div id="insight-box" style="display:none"></div>
+  <div class="section-title">Tekrarlayan Harcamalar</div>
+  <div class="form-section" id="recurring-form" style="display:none">
+    <div class="form-row fr1"><label class="field-label">Açıklama</label><input type="text" id="rec-desc" placeholder="ör. Kira, Netflix, Spor salonu"></div>
+    <div class="form-row fr2">
+      <div><label class="field-label">Tutar</label><input type="number" id="rec-amount" placeholder="₺" min="0"></div>
+      <div><label class="field-label">Kategori</label><select id="rec-cat"></select></div>
+    </div>
+    <div class="form-row fr2">
+      <div><label class="field-label">Sıklık</label>
+        <select id="rec-freq">
+          <option value="monthly">Her ay</option>
+          <option value="weekly">Her hafta</option>
+          <option value="yearly">Her yıl</option>
+        </select>
+      </div>
+      <div><label class="field-label">Gün</label><input type="number" id="rec-day" placeholder="Ayın kaçı?" min="1" max="31" value="1"></div>
+    </div>
+    <div class="form-row fr2">
+      <div><label class="field-label">Ödeme</label>
+        <select id="rec-method">
+          <option value="nakit">💵 Nakit</option>
+          <option value="kart">💳 Kart</option>
+          <option value="havale">🏦 Havale</option>
+        </select>
+      </div>
+      <div><label class="field-label">Aktif</label>
+        <select id="rec-active"><option value="1">Evet</option><option value="0">Hayır</option></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="submit-btn gider" style="flex:1" onclick="saveRecurring()">Kaydet</button>
+      <button class="submit-btn" style="background:var(--bg3);color:var(--muted);flex:0 0 80px;border:1px solid var(--border2)" onclick="cancelRecurring()">İptal</button>
+    </div>
+  </div>
+  <button class="add-kk-btn" onclick="toggleRecurringForm()" id="add-rec-btn">＋ Yeni tekrarlayan ekle</button>
+  <div id="recurring-list"><div class="empty"><div class="empty-icon">🔁</div>Henüz tekrarlayan harcama eklenmedi</div></div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /app -->
 
@@ -471,8 +517,56 @@ canvas{display:block}
   <button class="nav-btn" onclick="showTab('fis',this)"><span class="nav-icon">📷</span>Fiş</button>
   <button class="nav-btn" onclick="showTab('islemler',this)"><span class="nav-icon">📋</span>İşlemler</button>
   <button class="nav-btn" onclick="showTab('kartlar',this)"><span class="nav-icon">💳</span>Kartlar</button>
-  <button class="nav-btn" onclick="showTab('gecmis',this)"><span class="nav-icon">📊</span>Geçmiş</button>
+  <button class="nav-btn" onclick="showTab('tekrar',this)"><span class="nav-icon">🔁</span>Tekrar</button>
   <button class="nav-btn" onclick="showTab('grafik',this)"><span class="nav-icon">🍩</span>Grafik</button>
+</div>
+
+<!-- HELP MODAL -->
+<div class="modal-overlay" id="help-modal" onclick="closeHelp(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">? Nasıl Kullanılır</div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">➕ Harcama / Gelir Ekle</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Açıklama yaz → tutar gir → kategori seç → ekle. Açıklama yazarken kategori otomatik önerilir, tıklayarak seçebilirsin. Ödeme yöntemi olarak nakit, kredi kartı veya havale seçilebilir.</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">📷 Fiş Tara</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Alışveriş fişini fotoğrafla → yapay zeka ürünleri ve tutarları otomatik okur → onaylayıp giderlere tek tıkla eklersin. Ayarlar'dan API anahtarı girilmesi gerekir.</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">💳 Kredi Kartları</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Kartlarını ekle → kart ile yaptığın harcamalar otomatik bu karta işlenir → dönem ekstreni görürsün → "Ekstre Öde" ile borcunu kapatırsın. Son ödeme tarihine 5 gün kaldığında uyarı alırsın.</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">🔁 Tekrarlayan Harcamalar</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Kira, Netflix, aidat gibi sabit giderleri tanımla. Her ay o gün geldiğinde uygulama sana onay sorar — onaylarsan otomatik giderlere ekler. "Şimdi Değil" dersen o ay atlar.</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">📊 Geçmiş & Grafikler</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Üstteki ay okları ile geçmiş aylara geçebilirsin. Geçmiş sekmesinde aylık özet, Grafik sekmesinde kategori dağılımı ve trend görürsün. 5+ işlem sonrası bu ayki harcama tahmini ve anomali uyarıları aktif olur.</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">⚙ Ayarlar</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Aylık bütçe limitini ayarla → dolduğunda renkli uyarı çıkar. Verilerini CSV veya JSON olarak dışa aktarabilir, yedek alabilirsin. Fiş tarama için Anthropic API anahtarı buraya girilir.</div>
+      </div>
+
+      <div style="background:rgba(0,200,150,.07);border:1px solid rgba(0,200,150,.2);border-radius:var(--rs);padding:10px 14px">
+        <div style="font-size:11px;color:var(--accent);line-height:1.6">💡 <b>İpucu:</b> Tüm veriler sadece bu cihazda saklanır. Ayarlar'dan JSON yedek alarak verilerini koruyabilirsin.</div>
+      </div>
+
+    </div>
+
+    <button onclick="document.getElementById('help-modal').classList.remove('open')" style="width:100%;padding:12px;margin-top:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer">Kapat</button>
+  </div>
 </div>
 
 <!-- SETTINGS MODAL -->
@@ -693,6 +787,9 @@ SADECE JSON array döndür. Toplam/KDV/ara toplam satırlarını ekleme. Gerçek
       const data=await resp.json();
       document.getElementById('loading-wrap').style.display='none';
       if(data.error){
+        document.getElementById('fis-preview').style.display='none';
+        document.getElementById('fis-drop').style.display='block';
+        document.getElementById('fis-input').value='';
         document.getElementById('fis-status').style.display='block';
         document.getElementById('fis-status').textContent='Hata: '+data.error.message;
         return;
@@ -701,8 +798,11 @@ SADECE JSON array döndür. Toplam/KDV/ara toplam satırlarını ekleme. Gerçek
       const clean=text.replace(/```json?|```/g,'').trim();
       const items=JSON.parse(clean);
       if(!items.length){
+        document.getElementById('fis-preview').style.display='none';
+        document.getElementById('fis-drop').style.display='block';
+        document.getElementById('fis-input').value='';
         document.getElementById('fis-status').style.display='block';
-        document.getElementById('fis-status').textContent='Fişte ürün bulunamadı.';
+        document.getElementById('fis-status').textContent='Fişte ürün bulunamadı. Daha net bir fotoğraf dene.';
         return;
       }
       pendingFis=items;
@@ -716,8 +816,11 @@ SADECE JSON array döndür. Toplam/KDV/ara toplam satırlarını ekleme. Gerçek
       document.getElementById('fis-actions').style.display='flex';
     }catch(err){
       document.getElementById('loading-wrap').style.display='none';
+      document.getElementById('fis-preview').style.display='none';
+      document.getElementById('fis-drop').style.display='block';
+      document.getElementById('fis-input').value='';
       document.getElementById('fis-status').style.display='block';
-      document.getElementById('fis-status').textContent='Analiz başarısız: '+err.message;
+      document.getElementById('fis-status').textContent='Analiz başarısız: '+err.message+' — Tekrar fotoğraf yükleyebilirsin.';
     }
   };
   reader.readAsDataURL(file);
@@ -1071,6 +1174,13 @@ function render(){
 }
 
 /* ── SETTINGS ── */
+function openHelp(){
+  document.getElementById('help-modal').classList.add('open');
+}
+function closeHelp(e){
+  if(e.target===document.getElementById('help-modal'))
+    document.getElementById('help-modal').classList.remove('open');
+}
 function openSettings(){
   document.getElementById('settings-modal').classList.add('open');
   document.getElementById('budget-input').value=state.budget;
@@ -1182,12 +1292,255 @@ function showTab(tab,btn){
   if(tab==='grafik')renderGrafik();
   if(tab==='gecmis')renderHistory();
   if(tab==='kartlar')renderKartlar();
+  if(tab==='tekrar'){renderRecurring();renderInsights();}
+}
+
+/* ── KATEGORİ ÖNERİSİ ── */
+const CAT_KEYWORDS={
+  market:['market','migros','bim','a101','şok','carrefour','metro','hakmar','file','getir'],
+  yemek:['restoran','kafe','cafe','pizza','burger','döner','kebap','kahve','starbucks','yemek','lokanta','mcdonald','kfc'],
+  ulasim:['taksi','uber','bolt','metro','otobüs','dolmuş','yakıt','benzin','shell','bp','opet','park','uçak','tren'],
+  saglik:['eczane','ilaç','doktor','hastane','diş','gözlük','vitamin','tahlil'],
+  giyim:['lcw','zara','h&m','mavi','koton','defacto','ayakkabı','gömlek','pantolon','elbise','kıyafet'],
+  eglence:['sinema','netflix','spotify','oyun','konser','tiyatro','steam','playstation'],
+  fatura:['elektrik','su','doğalgaz','internet','telefon','vodafone','turkcell','fatura','aidat','kira'],
+  diger:[]
+};
+let lastSuggestion=null;
+function suggestCategory(val){
+  if(!val||val.length<3){document.getElementById('cat-suggestion').style.display='none';lastSuggestion=null;return;}
+  const v=val.toLowerCase();
+  let best=null;
+  for(const [cat,kws] of Object.entries(CAT_KEYWORDS)){
+    if(kws.some(k=>v.includes(k))){best=cat;break;}
+  }
+  if(!best){
+    const matches=state.transactions.filter(t=>t.type==='gider'&&t.desc&&t.desc.toLowerCase().includes(v.slice(0,4)));
+    if(matches.length>0){
+      const freq={};matches.forEach(t=>{freq[t.cat]=(freq[t.cat]||0)+1;});
+      best=Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0];
+    }
+  }
+  const el=document.getElementById('cat-suggestion');
+  if(best&&best!=='diger'){
+    const c=GIDER_CATS[best];
+    lastSuggestion=best;
+    el.style.display='block';
+    el.innerHTML='💡 Öneri: <b>'+c.icon+' '+c.label+'</b> — uygunsa tıkla';
+  } else {
+    el.style.display='none';lastSuggestion=null;
+  }
+}
+function applySuggestion(){
+  if(!lastSuggestion)return;
+  document.getElementById('category').value=lastSuggestion;
+  document.getElementById('cat-suggestion').style.display='none';
+}
+
+/* ── TEKRARLAYAN HARCAMALAR ── */
+function loadRecurring(){return JSON.parse(localStorage.getItem('bx_recurring')||'[]');}
+function saveRecurring2(list){localStorage.setItem('bx_recurring',JSON.stringify(list));}
+function toggleRecurringForm(){
+  const f=document.getElementById('recurring-form');
+  const b=document.getElementById('add-rec-btn');
+  const show=f.style.display==='none';
+  f.style.display=show?'block':'none';
+  b.style.display=show?'none':'block';
+  if(show){
+    const sel=document.getElementById('rec-cat');
+    sel.innerHTML=Object.keys(GIDER_CATS).map(k=>'<option value="'+k+'">'+GIDER_CATS[k].icon+' '+GIDER_CATS[k].label+'</option>').join('');
+  }
+}
+function cancelRecurring(){
+  document.getElementById('recurring-form').style.display='none';
+  document.getElementById('add-rec-btn').style.display='block';
+}
+function saveRecurring(){
+  const desc=document.getElementById('rec-desc').value.trim();
+  const amount=parseFloat(document.getElementById('rec-amount').value);
+  const cat=document.getElementById('rec-cat').value;
+  const freq=document.getElementById('rec-freq').value;
+  const day=parseInt(document.getElementById('rec-day').value)||1;
+  const method=document.getElementById('rec-method').value;
+  const active=document.getElementById('rec-active').value==='1';
+  if(!desc||!amount||!cat){alert('Açıklama, tutar ve kategori zorunlu.');return;}
+  const list=loadRecurring();
+  list.push({id:Date.now(),desc,amount,cat,freq,day,method,active,createdAt:new Date().toISOString()});
+  saveRecurring2(list);
+  cancelRecurring();
+  renderRecurring();
+}
+function deleteRecurring(id){
+  if(!confirm('Tekrarlayan harcama silinsin mi?'))return;
+  saveRecurring2(loadRecurring().filter(r=>r.id!==id));
+  renderRecurring();
+}
+function toggleRecurringActive(id){
+  const list=loadRecurring();
+  const r=list.find(r=>r.id===id);
+  if(r)r.active=!r.active;
+  saveRecurring2(list);
+  renderRecurring();
+}
+function applyDueRecurring(){
+  const list=loadRecurring();
+  const today=new Date();
+  const mk=(y,m)=>y+'-'+String(m).padStart(2,'0');
+  const appliedKey='bx_rec_applied_'+today.getFullYear()+'_'+today.getMonth();
+  const applied=JSON.parse(localStorage.getItem(appliedKey)||'[]');
+  const due=list.filter(r=>r.active&&!applied.includes(r.id)).filter(r=>{
+    if(r.freq==='monthly'&&today.getDate()===r.day)return true;
+    if(r.freq==='weekly'&&today.getDay()===r.day)return true;
+    if(r.freq==='yearly'&&today.getDate()===r.day&&today.getMonth()===0)return true;
+    return false;
+  });
+  if(!due.length)return;
+  showRecurringConfirm(due, applied, appliedKey, mk, today);
+}
+function showRecurringConfirm(due, applied, appliedKey, mk, today){
+  const existing=document.getElementById('recurring-confirm-modal');
+  if(existing)existing.remove();
+  const freqLabel={monthly:'Her ay',weekly:'Her hafta',yearly:'Her yıl'};
+  const rows=due.map((r,i)=>{
+    const c=GIDER_CATS[r.cat]||{label:r.cat,icon:'📦',color:'#888'};
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox" id="rconf'+i+'" checked style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0">'
+      +'<div style="width:32px;height:32px;border-radius:8px;background:'+c.color+'22;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">'+c.icon+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+r.desc+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">'+freqLabel[r.freq]+'</div></div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--red)">-'+fmt(r.amount)+'</div>'
+      +'</div>';
+  }).join('');
+  const modal=document.createElement('div');
+  modal.id='recurring-confirm-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)';
+  modal.innerHTML='<div style="background:var(--bg2);border-radius:var(--r) var(--r) 0 0;padding:20px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">'
+    +'<div style="width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px"></div>'
+    +'<div style="font-family:var(--display);font-size:17px;font-weight:700;margin-bottom:6px">🔁 Bugün vadesi gelen harcamalar</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Hangilerini giderlere eklemek istediğini seç:</div>'
+    +rows
+    +'<div style="display:flex;gap:8px;margin-top:16px">'
+    +'<button onclick="confirmRecurring('+JSON.stringify(due.map(r=>r.id)).replace(/"/g,"'")+','+JSON.stringify(applied).replace(/"/g,"'")+',''+appliedKey+'')" style="flex:1;padding:12px;background:var(--accent);color:#000;border:none;border-radius:var(--rs);font-size:13px;font-weight:700;cursor:pointer">✓ Seçilenleri Ekle</button>'
+    +'<button onclick="dismissRecurring('+JSON.stringify(due.map(r=>r.id)).replace(/"/g,"'")+','+JSON.stringify(applied).replace(/"/g,"'")+',''+appliedKey+'')" style="padding:12px 16px;background:var(--bg3);color:var(--muted);border:1px solid var(--border2);border-radius:var(--rs);font-size:12px;cursor:pointer">Şimdi Değil</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  // store refs for confirm
+  modal._due=due;modal._mk=mk;modal._today=today;
+}
+function confirmRecurring(ids, applied, appliedKey){
+  const modal=document.getElementById('recurring-confirm-modal');
+  if(!modal)return;
+  const due=modal._due;const mk=modal._mk;const today=modal._today;
+  const today2=new Date();
+  const mk2=(y,m)=>y+'-'+String(m).padStart(2,'0');
+  due.forEach((r,i)=>{
+    const chk=document.getElementById('rconf'+i);
+    if(!chk||!chk.checked)return;
+    applied.push(r.id);
+    state.transactions.unshift({id:Date.now()+Math.random(),desc:r.desc+' (otomatik)',amount:r.amount,cat:r.cat,type:'gider',method:r.method,date:today2.toLocaleDateString('tr-TR'),monthKey:mk2(today2.getFullYear(),today2.getMonth()),year:today2.getFullYear(),month:today2.getMonth(),kkIdx:null,taksitAdet:1,taksitFaiz:0,isRecurring:true});
+  });
+  localStorage.setItem(appliedKey,JSON.stringify(applied));
+  saveState();
+  modal.remove();
+  render();
+  showNotif('✓ Tekrarlayan harcamalar eklendi');
+}
+function dismissRecurring(ids, applied, appliedKey){
+  // mark as applied without adding
+  ids.forEach(id=>{if(!applied.includes(id))applied.push(id);});
+  localStorage.setItem(appliedKey,JSON.stringify(applied));
+  document.getElementById('recurring-confirm-modal')?.remove();
+}
+function renderRecurring(){
+  const list=loadRecurring();
+  const el=document.getElementById('recurring-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">🔁</div>Henüz tekrarlayan harcama eklenmedi</div>';return;}
+  const freqLabel={monthly:'Her ay',weekly:'Her hafta',yearly:'Her yıl'};
+  el.innerHTML=list.map(r=>{
+    const c=GIDER_CATS[r.cat]||{label:r.cat,icon:'📦',color:'#888'};
+    return '<div class="card card-pad" style="margin-bottom:8px;opacity:'+(r.active?1:0.5)+'">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:36px;height:36px;border-radius:10px;background:'+c.color+'22;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">'+c.icon+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.desc+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+freqLabel[r.freq]+' · '+r.day+'. gün · '+r.method+'</div></div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--red);flex-shrink:0">-'+fmt(r.amount)+'</div></div>'
+      +'<div style="display:flex;gap:6px;margin-top:10px">'
+      +'<button onclick="toggleRecurringActive('+r.id+')" style="flex:1;padding:7px;font-size:11px;font-weight:600;border:1px solid var(--border2);border-radius:var(--rs);background:'+(r.active?'var(--accent)':'var(--bg3)')+';color:'+(r.active?'#000':'var(--muted)')+';cursor:pointer">'+(r.active?'✓ Aktif':'Pasif')+'</button>'
+      +'<button onclick="deleteRecurring('+r.id+')" style="padding:7px 12px;font-size:11px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg3);color:var(--red);cursor:pointer">Sil</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+/* ── TAHMİN & ANOMALİ ── */
+function analyzeSpending(){
+  const today=new Date();
+  const mk=(y,m)=>y+'-'+String(m).padStart(2,'0');
+  const months=[];
+  for(let i=1;i<=3;i++){let m=today.getMonth()-i,y=today.getFullYear();if(m<0){m+=12;y--;}months.push(mk(y,m));}
+  const avgByMonth=months.map(key=>state.transactions.filter(t=>t.monthKey===key&&t.type==='gider').reduce((s,t)=>s+t.amount,0));
+  const filled=avgByMonth.filter(v=>v>0);
+  const avg3=filled.length?filled.reduce((s,v)=>s+v,0)/filled.length:0;
+  const curKey=mk(today.getFullYear(),today.getMonth());
+  const curTxs=state.transactions.filter(t=>t.monthKey===curKey&&t.type==='gider');
+  const curTotal=curTxs.reduce((s,t)=>s+t.amount,0);
+  const daysInMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  const daysPassed=today.getDate();
+  const projected=daysPassed>0?Math.round(curTotal/daysPassed*daysInMonth):0;
+  const anomalies=[];
+  const curCat={};curTxs.forEach(t=>{curCat[t.cat]=(curCat[t.cat]||0)+t.amount;});
+  const histCat={};
+  months.forEach(key=>state.transactions.filter(t=>t.monthKey===key&&t.type==='gider').forEach(t=>{histCat[t.cat]=(histCat[t.cat]||0)+t.amount;}));
+  Object.keys(curCat).forEach(cat=>{
+    const histAvg=(histCat[cat]||0)/3;
+    if(histAvg>100){
+      const ratio=curCat[cat]/histAvg;
+      if(ratio>=1.4){const c=GIDER_CATS[cat]||{label:cat,icon:'📦'};anomalies.push(c.icon+' '+c.label+' harcaman normalden <b>%'+Math.round((ratio-1)*100)+' fazla</b>');}
+    }
+  });
+  return {avg3,curTotal,projected,anomalies};
+}
+function renderInsights(){
+  const el=document.getElementById('insight-box');
+  if(!el)return;
+  if(state.transactions.filter(t=>t.type==='gider').length<5){el.style.display='none';return;}
+  const {avg3,projected,anomalies}=analyzeSpending();
+  let html='';
+  if(projected>0&&avg3>0){
+    const diff=projected-avg3;
+    const sign=diff>0?'+':'';
+    const color=diff>avg3*0.15?'var(--red)':diff<-avg3*0.1?'var(--accent)':'var(--muted)';
+    html+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px 14px;margin-bottom:8px">'
+      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">📊 Bu Ay Tahmini</div>'
+      +'<div style="font-size:22px;font-weight:700;color:'+color+'">'+fmt(projected)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:3px">3 ay ort: '+fmt(Math.round(avg3))+' · <span style="color:'+color+'">'+sign+fmt(Math.abs(Math.round(diff)))+'</span></div>'
+      +'</div>';
+  }
+  if(anomalies.length){
+    html+='<div style="background:rgba(255,79,78,.07);border:1px solid rgba(255,79,78,.2);border-radius:var(--r);padding:12px 14px;margin-bottom:8px">'
+      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px">⚠ Dikkat Çeken Harcamalar</div>'
+      +anomalies.map(a=>'<div style="font-size:12px;color:var(--text);margin-bottom:4px">'+a+'</div>').join('')
+      +'</div>';
+  }
+  const recList=loadRecurring().filter(r=>r.active);
+  if(recList.length){
+    const recTotal=recList.reduce((s,r)=>s+r.amount,0);
+    html+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px 14px;margin-bottom:8px">'
+      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">🔁 Bu Ay Sabit Giderler</div>'
+      +'<div style="font-size:18px;font-weight:700;color:var(--red)">'+fmt(recTotal)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+recList.length+' tekrarlayan harcama</div>'
+      +'</div>';
+  }
+  if(html){el.style.display='block';el.innerHTML=html;}
+  else el.style.display='none';
 }
 
 /* ── INIT ── */
 function init(){
   buildCatSelect();
   document.getElementById('tx-date').valueAsDate=new Date();
+  applyDueRecurring();
+  renderRecurring();
+  renderInsights();
   // Check card payment reminders
   if(state.notifEnabled&&'Notification' in window&&Notification.permission==='granted'){
     const today=new Date();
